@@ -51,5 +51,5 @@ if __name__ == '__main__':
         tr = 'all(average across test rounds)'
         metrics.overall_metrics_to_csv(row_alls = row_alls, test_round = tr,pipeline = pipeline, model_py=mod)
         print('csv of metrics has been produced.')
-        print('End of program')
+    print('End of program')
 
