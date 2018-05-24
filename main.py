@@ -9,7 +9,7 @@ import os
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Which model.py would you like to run?')
-    parser.add_argument('models',nargs='+', help='specify which .py in proto_models you would like to run ')
+    parser.add_argument('--models',nargs='+', help='specify which .py in proto_models you would like to run ')
     args = parser.parse_args()
     argsm = args.models
     if 'all' in argsm:
@@ -19,6 +19,7 @@ if __name__ == '__main__':
         module_list = argsm
 
     for mod in module_list:
+        print(f'Running {mod}')
         model = __import__(mod)
         df = load.import_sales_data_from_bq()
         df = prep.clean_data(df)
