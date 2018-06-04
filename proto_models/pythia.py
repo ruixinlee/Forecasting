@@ -14,31 +14,33 @@ class Data_Transformer(BaseEstimator, TransformerMixin):
         self.params = params
 
     def cal_theta(self, X, y):
-        X['year'] = X['target_month'].dt.year
-        X['quarter'] = X['target_month'].apply(lambda x: (x.month-1)//3 + 1)
-        X['month_in_quarter'] = X['target_month'].dt.month - ((X['target_month'].dt.month-1)//3)*3
-
+        X = self.X_transform(X)
         X['actual_sales'] = y
         actual_sales_qtr = pd.DataFrame(X.groupby(['market', 'vehicle_line', 'year', 'quarter'])['actual_sales'].apply(sum))
         actual_sales_qtr.rename(columns={'actual_sales': 'actual_sales_qtr'}, inplace=True)
         X = X.join(actual_sales_qtr, on=['market', 'vehicle_line', 'year', 'quarter'])
-
         return(X)
 
-    def fit(self, X, y=None):
-
-        X =self.cal_theta(X,y)
-        X['theta'] = X['actual_sales'] / X['actual_sales_qtr']
-        self.thetas = dict(tuple(X[['market', 'vehicle_line', 'quarter', 'month_in_quarter', 'theta']].groupby(['market', 'vehicle_line', 'quarter', 'month_in_quarter'])['theta']))
-
-        return self
-
-    def transform(self, X):
+    def X_transform(self, X):
         X['year'] = X['target_month'].dt.year
         X['quarter'] = X['target_month'].apply(lambda x: (x.month-1)//3 + 1)
         X['month_in_quarter'] = X['target_month'].dt.month - ((X['target_month'].dt.month-1)//3)*3
+        return(X)
 
-        if 'actual_sales' not in X.columns:
+    def fit(self, X, y=None):
+        X =self.cal_theta(X,y)
+        X['theta'] = X['actual_sales'] / X['actual_sales_qtr']
+        self.thetas = dict(tuple(X[['market', 'vehicle_line', 'quarter', 'month_in_quarter', 'theta']].groupby(['market', 'vehicle_line', 'quarter', 'month_in_quarter'])['theta']))
+        self.fitted_X = X
+        return self
+
+    def transform(self, X):
+        X = self.X_transform(X)
+        X_ind = np.sort(X.index.values)
+        fitted_X = np.sort(self.fitted_X.index.values)
+        if (len(X_ind) == len(fitted_X)) and all(X_ind== fitted_X):
+            X = self.fitted_X
+        else:
             X['theta'] = np.nan
             for i in range(0, len(X)):
                 market = X.iloc[i]['market']
@@ -48,8 +50,6 @@ class Data_Transformer(BaseEstimator, TransformerMixin):
                 theta = np.mean(self.thetas[market, vehicle_line, quarter, month_in_quarter])
                 X.iloc[i, -1] = theta
                 self.thetas[market, vehicle_line, quarter, month_in_quarter].append(pd.Series(theta))
-        else:
-            X = self.cal_theta(X,y)
 
         X['IHS_t_vl_mth'] = X['IHS_t_vl'] * X['theta']
         X['IHS_t_mth'] = X['IHS_t'] * X['theta']
