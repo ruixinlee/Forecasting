@@ -13,37 +13,43 @@ class Data_Transformer(BaseEstimator, TransformerMixin):
     def __init__(self, params=None):
         self.params = params
 
-    def fit(self, X, y=None):
-        X['target_year'] = X['target_month'].dt.year
-        X['target_qtr'] = X['target_month'].apply(lambda x: (x.month-1)//3 + 1)
-        X['target_mth'] = X['target_month'].dt.month - ((X['target_month'].dt.month-1)//3)*3
+    def cal_theta(self, X, y):
+        X['year'] = X['target_month'].dt.year
+        X['quarter'] = X['target_month'].apply(lambda x: (x.month-1)//3 + 1)
+        X['month_in_quarter'] = X['target_month'].dt.month - ((X['target_month'].dt.month-1)//3)*3
 
         X['actual_sales'] = y
-        actual_sales_qtr = pd.DataFrame(X.groupby(['market', 'vehicle_line', 'target_year', 'target_qtr'])['actual_sales'].apply(sum))
+        actual_sales_qtr = pd.DataFrame(X.groupby(['market', 'vehicle_line', 'year', 'quarter'])['actual_sales'].apply(sum))
         actual_sales_qtr.rename(columns={'actual_sales': 'actual_sales_qtr'}, inplace=True)
-        X = X.join(actual_sales_qtr, on=['market', 'vehicle_line', 'target_year', 'target_qtr'])
+        X = X.join(actual_sales_qtr, on=['market', 'vehicle_line', 'year', 'quarter'])
 
+        return(X)
+
+    def fit(self, X, y=None):
+
+        X =self.cal_theta(X,y)
         X['theta'] = X['actual_sales'] / X['actual_sales_qtr']
-        self.thetas = dict(tuple(X[['market', 'vehicle_line', 'target_qtr', 'target_mth', 'theta']].groupby(['market', 'vehicle_line', 'target_qtr', 'target_mth'])['theta']))
+        self.thetas = dict(tuple(X[['market', 'vehicle_line', 'quarter', 'month_in_quarter', 'theta']].groupby(['market', 'vehicle_line', 'quarter', 'month_in_quarter'])['theta']))
 
-        X['IHS_t_vl_mth'] = X['IHS_t_vl'] * X['theta']
-        X['IHS_t_mth'] = X['IHS_t'] * X['theta']
         return self
 
     def transform(self, X):
-        X['target_year'] = X['target_month'].dt.year
-        X['target_qtr'] = X['target_month'].apply(lambda x: (x.month-1)//3 + 1)
-        X['target_mth'] = X['target_month'].dt.month - ((X['target_month'].dt.month-1)//3)*3
+        X['year'] = X['target_month'].dt.year
+        X['quarter'] = X['target_month'].apply(lambda x: (x.month-1)//3 + 1)
+        X['month_in_quarter'] = X['target_month'].dt.month - ((X['target_month'].dt.month-1)//3)*3
 
-        X['theta'] = np.nan
-        for i in range(0, len(X)):
-            market = X.iloc[i]['market']
-            vehicle_line = X.iloc[i]['vehicle_line']
-            qtr = X.iloc[i]['target_qtr']
-            month = X.iloc[i]['target_mth']
-            theta = np.mean(self.thetas[market, vehicle_line, qtr, month])
-            X.iloc[i, -1] = theta
-            self.thetas[market, vehicle_line, qtr, month].append(pd.Series(theta))
+        if 'actual_sales' not in X.columns:
+            X['theta'] = np.nan
+            for i in range(0, len(X)):
+                market = X.iloc[i]['market']
+                vehicle_line = X.iloc[i]['vehicle_line']
+                quarter = X.iloc[i]['quarter']
+                month_in_quarter = X.iloc[i]['month_in_quarter']
+                theta = np.mean(self.thetas[market, vehicle_line, quarter, month_in_quarter])
+                X.iloc[i, -1] = theta
+                self.thetas[market, vehicle_line, quarter, month_in_quarter].append(pd.Series(theta))
+        else:
+            X = self.cal_theta(X,y)
 
         X['IHS_t_vl_mth'] = X['IHS_t_vl'] * X['theta']
         X['IHS_t_mth'] = X['IHS_t'] * X['theta']
@@ -62,7 +68,7 @@ class Pythia(BaseEstimator, RegressorMixin):
         for k,v in X_dict.items():
             self.model[k] = Prophet()
             ds = v['target_month']
-            target = np.log(v['y'])
+            target = v['y']
             prophet_df = pd.DataFrame({'ds': ds, 'y': target})
             self.model[k].fit(prophet_df) #create a model for each k (market and vehicle line)
         return self
