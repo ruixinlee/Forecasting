@@ -25,6 +25,9 @@ def mean_percentage_absolute_error(y_true, y_pred):
     mape = dev_ratio.sum()/n*100
     return(mape)
 
+def TEASE(y_true, y_pred):
+    tease = sum(y_true)-sum(y_pred)
+    return(tease)
 
 def cal_metrics(test_target,predictions, data_size,  predictors_num=None):
     if predictors_num is not None:
@@ -34,8 +37,8 @@ def cal_metrics(test_target,predictions, data_size,  predictors_num=None):
     r2 = r2_score(test_target, predictions)
     rmse = np.sqrt(mean_squared_error(test_target, predictions))
     mape = mean_percentage_absolute_error(test_target, predictions)
-
-    md = {'ad_r2':ad_r2, 'r2': r2, 'rmse':rmse, 'mape': mape}
+    tease = TEASE(test_target,predictions)
+    md = {'ad_r2':ad_r2, 'r2': r2, 'rmse':rmse, 'mape': mape, 'TEASE':tease}
     return(md)
 
 def write_metrics(row):
