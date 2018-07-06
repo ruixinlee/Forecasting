@@ -3,7 +3,6 @@ import pandas as pd
 
 def clean_data(df):
 
-    ts_col_names = df.columns.values.tolist()
     date_col = ['target_month', 'IHS_time_of_prediction']
 
     for col in date_col:
@@ -11,6 +10,17 @@ def clean_data(df):
 
 
     return(df)
+
+def clean_data_VL_day(df):
+
+    date_col = ['target_month', 'most_recent_prediction_made_date']
+
+    for col in date_col:
+        df[col] = pd.to_datetime(df[col])
+
+
+    return(df)
+
 
 def train_test_split(df):
     target_col = 'actual_sales'

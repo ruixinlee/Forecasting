@@ -18,6 +18,8 @@ if __name__ == '__main__':
     else:
         module_list = argsm
 
+
+
     for mod in module_list:
         print(f'Running {mod}')
         model = __import__(mod)
@@ -35,6 +37,7 @@ if __name__ == '__main__':
 
             test_X = tests[k]['X']
             test_y = tests[k]['y']
+
 
 
             pipeline = model.construct_Pipline()

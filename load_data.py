@@ -4,7 +4,16 @@ from google.cloud import bigquery as bq
 
 bq_config = {'proj_id' : 'jlr-dl-cat',
              'dset_id' : '2017_Forecasting_Volume_NS_DEV',
-             'tb_id' : 'DEV_Forecasting_NS_Master_VL'}
+             'tb_id' : 'DEV_Forecasting_NS_Master_all_markets_agg'}
+
+bq_config2 = {'proj_id' : 'jlr-dl-cat',
+             'dset_id' : '2017_Forecasting_Volume_NS_DEV',
+             'tb_id' : 'DEV_Forecasting_NS_Master_all_markets'}
+
+bq_config_warm_down = {'proj_id' : 'jlr-dl-cat',
+                        'dset_id' : '2017_Forecasting_Volume_NS_DEV',
+                        'tb_id' : 'warm_down_period_flag'}
+
 
 raw_path =".\\data\\input\\"
 
@@ -49,7 +58,7 @@ def import_sales_permm_from_bq(bq_config=bq_config):
 
 def import_sales_data_from_bq(bq_config=bq_config):
 
-    q = f"""SELECT * FROM `{bq_config['proj_id']}.{bq_config['dset_id']}.{bq_config['tb_id']}` where target_month  <= '2018-04-01' """
+    q = f"""SELECT * FROM `{bq_config['proj_id']}.{bq_config['dset_id']}.{bq_config['tb_id']}` """
 
     df = load_data_from_bq(q,bq_config)
     return(df)
