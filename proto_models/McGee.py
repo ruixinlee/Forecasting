@@ -25,7 +25,7 @@ def plot_acf_pacf(res):
 
 
 class IHS_selector(BaseEstimator,TransformerMixin):
-    def __init__(self, predictors = ['ihs_t_vl', 'IHS_t']):
+    def __init__(self, predictors = ['IHS_t']):
         self.predictors = predictors
 
     def fit(self, X, y=None):
@@ -62,7 +62,7 @@ class McGee(BaseEstimator,RegressorMixin):
     def calibrate_SARIMAX(self, ts, sarimax):
         model = sm.tsa.statespace.SARIMAX(ts, order=sarimax['order'], seasonal_order=sarimax['sorder'],
                                           trend=sarimax['trend'], enforce_stationarity=sarimax['es'],
-                                          mle_regression=False).fit(disp =False)
+                                          mle_regression=False).fit(disp =False, method='bfgs', maxiter= 100)
         return (model)
 
     def calibrate_pacf(self, res):
@@ -94,6 +94,8 @@ class McGee(BaseEstimator,RegressorMixin):
             sarimax['sorder'] = (1, 0, 0, 12)
             res_model = self.calibrate_SARIMAX(res, sarimax)
 
+        res_model = self.calibrate_SARIMAX(res, sarimax)
+
         if self.calibrate_pacf(res_model.resid)[0][1] >= 0.3:
 
             if (self.calibrate_pacf(res_model.resid)[0][2] > 0.2 and self.calibrate_pacf(res_model.resid)[0][3] > 0.1):
@@ -118,10 +120,14 @@ class McGee(BaseEstimator,RegressorMixin):
                 sarimax['order'] = (1, 0, 0)
                 res_model = self.calibrate_SARIMAX(res, sarimax)
 
+        res_model = self.calibrate_SARIMAX(res, sarimax)
+
+
       ########################################
         sum_of_params = sum(sarimax['order']) + sum(sarimax['sorder'])
         if sum_of_params <= 13:
-            trend = [[0, 1, 0, 0],[0, 0, 1, 0], [0, 0, 0, 1]]
+            trend = [[0, 1, 0, 0],[0, 1, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+            term = [['drift'], ['drift', 'trend.2'], ['trend.2'], ['trend.3'], ['drift', 'trend.3'], ['drift', 'trend.2', 'trend.3'], ['trend.2', 'trend.3'] ]
             aic = []
             p_values = []
             original_aic = self.calibrate_SARIMAX(res, sarimax).aic
@@ -130,14 +136,34 @@ class McGee(BaseEstimator,RegressorMixin):
                 sarimax_temp['trend'] = t
                 res_model =self.calibrate_SARIMAX(res, sarimax_temp)
                 aic.append(res_model.aic)
-                p_values.append(res_model.pvalues[0])
+                p_values.append(np.mean(res_model.pvalues[term[i]]))
 
-            selected_k = [k for k, p in enumerate(p_values) if p <0.05]
+            selected_k = [k for k, p in enumerate(p_values) if p <0.2]
             if len(selected_k) > 0:
                 selected_aic = [a for k,a in enumerate(aic) if k in selected_k]
                 if original_aic - min(selected_aic) > 3:
                     trend_selected = [(k, trend[k]) for k, a in enumerate(aic) if a == min(selected_aic)][0]
                     sarimax['trend'] = trend_selected[1]
+
+        res_model = self.calibrate_SARIMAX(res, sarimax)
+        sarimax['es'] =True
+
+        try:
+            res_model = self.calibrate_SARIMAX(res, sarimax)
+        except:
+            if sarimax['sorder'][0]>0 and res_model._params_seasonal_ar >=0.7:
+                sarimax['sorder'] = (1, 1, 0, 12)
+                try:
+                    res_model = self.calibrate_SARIMAX(res, sarimax)
+                except:
+                    sarimax['sorder'] = (1, 0, 0, 12)
+                    sarimax['es'] = False
+
+            if sarimax['order'][0] > 0 and res_model.arparams >= 0.7:
+                sarimax['order'] = (1, 1, 0)
+
+
+
 
         self.sarimax_structure = sarimax
         return(self.sarimax_structure)
@@ -180,8 +206,8 @@ if __name__ == '__main__':
     timeline = 'target_month'
     vehicle_line = 'vehicle_line'
 
-    actuals_end_date = parser.parse('2018-03-01')
-    test_start_date = parser.parse('2017-03-01')
+    actuals_end_date = parser.parse('2018-04-01')
+    test_start_date = parser.parse('2018-04-01')
 
     all_predictors = ['ihs_t_vl', 'IHS_t']
     target = 'actual_sales'
