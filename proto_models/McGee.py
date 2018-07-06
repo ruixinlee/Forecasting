@@ -67,12 +67,12 @@ class McGee(BaseEstimator,RegressorMixin):
         return (pacf)
 
     def calibrate_sarimax_structure(self, res):
-        sarimax = {'order' : (0, 0, 0),
+        sarimax = {'order': (0, 0, 0),
                    'sorder': (0, 0, 0, 12),
-                   'trend' : [0, 0, 0, 0],
-                   'es'    : False}
+                   'trend': [0, 0, 0, 0],
+                   'es': False}
 
-        if self.calibrate_pacf(res)[0][12] >= 0.1:
+        if self.calibrate_pacf(res)[0][12] >= 0.2:
             if self.calibrate_pacf(res)[0][24] > 0.05:
                 sarimax['sorder'] = (0, 1, 0, 12)
                 res_model = self.calibrate_SARIMAX(res, sarimax)
@@ -86,11 +86,15 @@ class McGee(BaseEstimator,RegressorMixin):
 
                 if self.calibrate_pacf(res_model.resid)[0][12] < -0.2:
                     sarimax['sorder'] = (0, 0, 0, 12)
-
-        res_model = self.calibrate_SARIMAX(res, sarimax)
+                    res_model = self.calibrate_SARIMAX(res_model.resid, sarimax)
+        else:
+            sarimax['sorder'] = (1, 0, 0, 12)
+            res_model = self.calibrate_SARIMAX(res, sarimax)
 
         if self.calibrate_pacf(res_model.resid)[0][1] >= 0.3:
+
             if (self.calibrate_pacf(res_model.resid)[0][2] > 0.2 and self.calibrate_pacf(res_model.resid)[0][3] > 0.1):
+
                 sarimax['order'] = (0, 1, 0)
                 res_model = self.calibrate_SARIMAX(res, sarimax)
                 if (self.calibrate_pacf(res_model.resid)[0][1] > 0.3):
@@ -102,52 +106,29 @@ class McGee(BaseEstimator,RegressorMixin):
                 elif (self.calibrate_pacf(res_model.resid)[0][1] > -0.35 and self.calibrate_pacf(res_model.resid)[0][1] <= 0):
                     sarimax['order'] = (0, 0, 0)
                     res_model = self.calibrate_SARIMAX(res, sarimax)
+
             else:
                 sarimax['order'] = (1, 0, 0)
-        elif all(self.calibrate_pacf(res_model.resid)[0][1:4] >0.05):
-            pacf = self.calibrate_pacf(res_model.resid)[0][1:4]
-            order = [i for i,k in enumerate(pacf) if k>0.3]
-            if len(order) >0:
-                ord = order[0]+1
-                sarimax['order'] = (ord, 0, 0)
                 res_model = self.calibrate_SARIMAX(res, sarimax)
-                print(res_model.pvalues[f'ar.L{str(ord)}'])
-                if res_model.pvalues[f'ar.L{str(ord)}'] > 0.05:
-                    sarimax['order'] = (1, 0, 0)
-                    res_model = self.calibrate_SARIMAX(res, sarimax)
-                    print(res_model.pvalues['ar.L1'])
-                    if res_model.pvalues['ar.L1'] > 0.05:
-                        sarimax['order'] = (0, 0, 0)
 
-        elif all(self.calibrate_pacf(res_model.resid)[0][1:4] <0):
-            sarimax['order'] = (0, 0, 1)
-            res_model = self.calibrate_SARIMAX(res, sarimax)
-            print(res_model.pvalues['ma.L1'])
-            if res_model.pvalues['ma.L1'] > 0.05:
-                sarimax['order'] = (0, 0, 0)
-
-        res_model = self.calibrate_SARIMAX(res, sarimax)
-
-        # http://faculty.washington.edu/skalski/classes/QERM597/papers_xtra/Burnham%20and%20Anderson.pdf
+      ########################################
         sum_of_params = sum(sarimax['order']) + sum(sarimax['sorder'])
         if sum_of_params <= 13:
-            sarimax_temp = sarimax
-            trend = [[0, 0, 0, 0],[0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
+            trend = [[0, 0, 1, 0], [0, 0, 0, 1]]
             aic = []
             p_values = []
+            sarimax_temp = sarimax.copy()
             for i, t in enumerate(trend):
+                print('fitting t')
                 sarimax_temp['trend'] = t
-                res_model = self.calibrate_SARIMAX(res, sarimax_temp)
+                res_model =self.calibrate_SARIMAX(res, sarimax_temp)
                 aic.append(res_model.aic)
                 p_values.append(res_model.pvalues[0])
-            #http://faculty.washington.edu/skalski/classes/QERM597/papers_xtra/Burnham%20and%20Anderson.pdf
 
-            aic_difference = [k - aic[0] for k in aic]
             trend_selected = [(k, trend[k]) for k, a in enumerate(aic) if a == min(aic)][0]
-            if trend_selected[1] != [0, 0, 0, 0]:
-                if aic_difference[trend_selected[0]]>=3 and  p_values[trend_selected[0]] < 0.2:
-                #if p_values[trend_selected[0]] < 0.2:
-                    sarimax['trend'] = trend_selected[1]
+
+            if p_values[trend_selected[0]] < 0.2:
+                sarimax['trend'] = trend_selected[1]
 
         self.sarimax_structure = sarimax
         return(self.sarimax_structure)
