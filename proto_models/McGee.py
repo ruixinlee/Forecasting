@@ -11,6 +11,9 @@ from sklearn.pipeline import Pipeline
 sys.path.append('..')
 import functions
 
+pd.set_option('display.max_rows', 500)
+pd.set_option('display.max_columns', 500)
+pd.set_option('display.width', 1000)
 
 def plot_acf_pacf(res):
     fig = plt.figure(figsize=(12, 8))
@@ -42,9 +45,9 @@ class IHS_selector(BaseEstimator,TransformerMixin):
 
 
 class McGee(BaseEstimator,RegressorMixin):
-    def __init__(self, sarimax_params = None, print = False, calibrate = True, target_attr = 'actual_sales',predictor_attr = None, vl = None ):
+    def __init__(self, sarimax_params = None, save_output = False, calibrate = True, target_attr = 'actual_sales',predictor_attr = None, vl = None ):
         self.params = None
-        self.print = print
+        self.save_output = save_output
         self.calibrate = calibrate
         self.target_attr = target_attr
         self.predictor_attr = predictor_attr
@@ -59,7 +62,7 @@ class McGee(BaseEstimator,RegressorMixin):
     def calibrate_SARIMAX(self, ts, sarimax):
         model = sm.tsa.statespace.SARIMAX(ts, order=sarimax['order'], seasonal_order=sarimax['sorder'],
                                           trend=sarimax['trend'], enforce_stationarity=sarimax['es'],
-                                          mle_regression=False).fit()
+                                          mle_regression=False).fit(disp =False)
         return (model)
 
     def calibrate_pacf(self, res):
@@ -101,8 +104,12 @@ class McGee(BaseEstimator,RegressorMixin):
                     sarimax['order'] = (1, 1, 0)
                     res_model = self.calibrate_SARIMAX(res, sarimax)
                 elif (self.calibrate_pacf(res_model.resid)[0][1] < -0.35):
-                    sarimax['order'] = (0, 1, 1)
-                    res_model = self.calibrate_SARIMAX(res, sarimax)
+                    try:
+                        sarimax['order'] = (0, 1, 1)
+                        res_model = self.calibrate_SARIMAX(res, sarimax)
+                    except Exception:
+                        sarimax['order'] = (1, 0, 0)
+                        res_model = self.calibrate_SARIMAX(res, sarimax)
                 elif (self.calibrate_pacf(res_model.resid)[0][1] > -0.35 and self.calibrate_pacf(res_model.resid)[0][1] <= 0):
                     sarimax['order'] = (0, 0, 0)
                     res_model = self.calibrate_SARIMAX(res, sarimax)
@@ -114,21 +121,23 @@ class McGee(BaseEstimator,RegressorMixin):
       ########################################
         sum_of_params = sum(sarimax['order']) + sum(sarimax['sorder'])
         if sum_of_params <= 13:
-            trend = [[0, 0, 1, 0], [0, 0, 0, 1]]
+            trend = [[0, 1, 0, 0],[0, 0, 1, 0], [0, 0, 0, 1]]
             aic = []
             p_values = []
+            original_aic = self.calibrate_SARIMAX(res, sarimax).aic
             sarimax_temp = sarimax.copy()
             for i, t in enumerate(trend):
-                print('fitting t')
                 sarimax_temp['trend'] = t
                 res_model =self.calibrate_SARIMAX(res, sarimax_temp)
                 aic.append(res_model.aic)
                 p_values.append(res_model.pvalues[0])
 
-            trend_selected = [(k, trend[k]) for k, a in enumerate(aic) if a == min(aic)][0]
-
-            if p_values[trend_selected[0]] < 0.2:
-                sarimax['trend'] = trend_selected[1]
+            selected_k = [k for k, p in enumerate(p_values) if p <0.05]
+            if len(selected_k) > 0:
+                selected_aic = [a for k,a in enumerate(aic) if k in selected_k]
+                if original_aic - min(selected_aic) > 3:
+                    trend_selected = [(k, trend[k]) for k, a in enumerate(aic) if a == min(selected_aic)][0]
+                    sarimax['trend'] = trend_selected[1]
 
         self.sarimax_structure = sarimax
         return(self.sarimax_structure)
@@ -171,8 +180,8 @@ if __name__ == '__main__':
     timeline = 'target_month'
     vehicle_line = 'vehicle_line'
 
-    actuals_end_date = parser.parse('2018-04-01')
-    test_start_date = parser.parse('2017-04-01')
+    actuals_end_date = parser.parse('2018-03-01')
+    test_start_date = parser.parse('2017-03-01')
 
     all_predictors = ['ihs_t_vl', 'IHS_t']
     target = 'actual_sales'
@@ -184,7 +193,7 @@ if __name__ == '__main__':
     sales_data_all['zeros'] = 0
 
     cols = ['TimeStamp', 'Forecasting Model', 'Forecasting Model Notes', 'Forecasted Month', 'Car Line (Model)',
-            'Forecast', 'Country', 'MSE', 'TEASE', 'TEASEP', 'mape']
+            'Forecast','actual_sales', 'Country', 'MSE', 'TEASE', 'TEASEP', 'mape']
 
     ##individual car
     vl = 'XE'
@@ -207,7 +216,7 @@ if __name__ == '__main__':
 
     final_result = []
     models_performance = []
-
+    models_sarimax = []
     csv_output_name = f'..\\output\\{model_name}'
     for vl in sales_data_all[vehicle_line].unique():
         if (vl not in ['E-PACE', 'F-PACE', 'I-PACE', 'RANGE ROVER VELAR', 'XK', 'FREELANDER', 'DEFENDER']):
@@ -223,12 +232,16 @@ if __name__ == '__main__':
             in_sample_pred = pipeline.named_steps['McGee'].fittedvalues
             upper_pi = pipeline.named_steps['McGee'].upperpi
             lower_pi = pipeline.named_steps['McGee'].lowerpi
+
+
             temp_result = functions.build_output(test, out_sample_pred, cols, model_name, vl)
             model_perf = functions.display_results(test[target], out_sample_pred, model_name, vl)
+            sarimax_structure = pipeline.named_steps['McGee'].sarimax_structure
+            model_perf.update(sarimax_structure)
+            model_perf['selected_predictor'] = pipeline.named_steps['IHS_selector'].selected_predictor
             models_performance.append(model_perf)
             final_result.append(temp_result)
 
-    print(in_sample_pred)
     final_result = pd.concat(final_result)
     final_result = final_result[cols]
     now = pd.Timestamp.now().strftime('%Y-%m-%d')
@@ -238,6 +251,6 @@ if __name__ == '__main__':
     models_performance = pd.DataFrame.from_dict(models_performance)
     print(models_performance)
 
-    print(models_performance[['MAPE', 'RMSE', 'TEASEP', 'vehicle_line']])
+    print(models_performance[['MAPE', 'RMSE', 'TEASEP', 'vehicle_line','es', 'order', 'sorder','trend','selected_predictor']])
     print('test')
 

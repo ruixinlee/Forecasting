@@ -38,6 +38,7 @@ def build_output(test, pred_test, cols, model_name, vl):
     temp_res = pd.DataFrame(columns=cols)
     temp_res['Forecasted Month'] = test.index
     temp_res['Forecast'] = pred_test.values
+    temp_res['actual_sales'] = test['actual_sales'].tolist()
     temp_res['Car Line (Model)'] = [vl] * temp_res.shape[0]
     temp_res['Forecasting Model'] = [results_dict['Model']] * temp_res.shape[0]
     temp_res['Forecasting Model Notes'] = ['Script: exo_lm_global_residuals_with_arima'] * temp_res.shape[0]
@@ -46,6 +47,7 @@ def build_output(test, pred_test, cols, model_name, vl):
     temp_res['TEASE'] = [results_dict['TAD']] * temp_res.shape[0]
     temp_res['TEASEP'] = [results_dict['TEASEP']] * temp_res.shape[0]
     temp_res['mape'] = [results_dict['MAPE']] * temp_res.shape[0]
+
     return (temp_res)
 
 
