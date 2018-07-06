@@ -76,7 +76,7 @@ import numpy as np
 from dateutil import parser
 import math
 import pylab
-get_ipython().run_line_magic('matplotlib', 'inline')
+
 import matplotlib.pyplot as plt
 from sklearn import linear_model
 import statsmodels.api as sm
@@ -119,7 +119,6 @@ def separate_training_portfolio(full_dataset, target_vehicle_line, split_date):
     return (train, portfolio)
 
 
-# In[4]:
 
 
 def split_train_test(sales_data_all, vl, actuals_end_date):
@@ -133,7 +132,7 @@ def split_train_test(sales_data_all, vl, actuals_end_date):
     return(train, test)
 
 
-# In[5]:
+
 
 
 def plot_forecast_sales(actual_sales, predictions_all, predict_ci_upper,predict_ci_lower, vl, nobs):
@@ -155,7 +154,7 @@ def plot_forecast_sales(actual_sales, predictions_all, predict_ci_upper,predict_
     
 
 
-# In[6]:
+
 
 
 def calibrate_SARIMAX(res,sarimax):
@@ -169,7 +168,6 @@ def calibrate_pacf(res):
     return(pacf)
 
 
-# In[7]:
 
 
 # Fit and predict using a linear model using statsmodels
@@ -339,7 +337,7 @@ def fit_and_predict_sm(train, test, target_attr, predictor_attr, plot_results = 
     return predictions_test
 
 
-# In[8]:
+
 
 
 # Fit and predict using a linear model from sklearn 
@@ -355,7 +353,7 @@ def fit_and_predict_lm(train, test, target_attr, predictor_attr):
   return predictions_test
 
 
-# In[9]:
+
 
 
 # Plot predictions
@@ -371,7 +369,6 @@ def plot_predictions(sales_vl, predicted_values, vl):
   ax.set_title("Forecast for " + vl)
 
 
-# In[10]:
 
 
 def plot_acf_pacf(res):
@@ -383,7 +380,6 @@ def plot_acf_pacf(res):
     plt.show()
 
 
-# In[11]:
 
 
 # Evaluation metrics
@@ -435,190 +431,6 @@ def display_results(true_values, predictions, name, vl=None):
     return (metrics_dict)
 
 
-# In[12]:
-
-
-vl = 'DISCOVERY SPORT'
-metrics_dat = []
-sarimax_order = {}
-sarimax_order['order'] = (0, 1, 0)
-sarimax_order['sorder'] = (1, 0 , 0, 12)
-sarimax_order['trend'] = [0, 0, 0, 0]
-sarimax_order['es'] = False
-
-train,test = split_train_test(sales_data_all, vl, actuals_end_date)
-
-pred_test = fit_and_predict_sm(train, test, target, all_predictors, plot_results = True, sarimax = sarimax_order, calibrate = False)
-metrics_dat.append(display_results(test[target].values, pred_test, model_name))
-metrics_dat = pd.DataFrame.from_dict(metrics_dat)
-
-print(metrics_dat)
-
-
-
-
-# In[13]:
-
-
-vl = 'DISCOVERY'
-
-metrics_dat = []
-sarimax_order = {}
-sarimax_order['order'] = (0, 0, 0)
-sarimax_order['sorder'] = (1, 0 , 0, 12)
-sarimax_order['trend'] = [0, 0, 0, 0]
-sarimax_order['es'] = False
-
-train,test = split_train_test(sales_data_all, vl, actuals_end_date)
-
-pred_test = fit_and_predict_sm(train, test, target, all_predictors, plot_results = True, sarimax = sarimax_order, calibrate = False)
-metrics_dat.append(display_results(test[target].values, pred_test, model_name))
-metrics_dat = pd.DataFrame.from_dict(metrics_dat)
-
-print(metrics_dat)
-
-
-
-
-
-# In[14]:
-
-
-vl = 'RANGE ROVER SPORT'
-metrics_dat = []
-sarimax_order = {}
-sarimax_order['order'] = (0, 0, 0)
-sarimax_order['sorder'] = (1, 0 , 0, 12)
-sarimax_order['trend'] = [0, 0, 1, 0]
-sarimax_order['es'] = False
-
-train,test = split_train_test(sales_data_all, vl, actuals_end_date)
-
-pred_test = fit_and_predict_sm(train, test, target, all_predictors, plot_results = True, sarimax = sarimax_order, calibrate = True)
-metrics_dat.append(display_results(test[target].values, pred_test, model_name))
-metrics_dat = pd.DataFrame.from_dict(metrics_dat)
-
-print(metrics_dat)
-
-
-
-# In[15]:
-
-
-vl = 'RANGE ROVER EVOQUE'
-
-metrics_dat = []
-sarimax_order = [(1, 1, 1), (1, 0, 0, 12), [0, 1, 0, 0], False]
-train,test = split_train_test(sales_data_all, vl, actuals_end_date)
-
-pred_test = fit_and_predict_sm(train, test, target, all_predictors, plot_results = False, sarimax = sarimax_order, calibrate = True)
-metrics_dat.append(display_results(test[target].values, pred_test, model_name))
-metrics_dat = pd.DataFrame.from_dict(metrics_dat)
-
-print(metrics_dat)
-
-
-# In[16]:
-
-
-vl = 'XF'
-
-metrics_dat = []
-sarimax_order = [(1,0,0),(1,1,0,12), [0,0,0,0]]
-train,test = split_train_test(sales_data_all, vl, actuals_end_date)
-
-pred_test = fit_and_predict_sm(train, test, target, all_predictors, plot_results = False, sarimax = sarimax_order, calibrate = True)
-metrics_dat.append(display_results(test[target].values, pred_test, model_name))
-metrics_dat = pd.DataFrame.from_dict(metrics_dat)
-
-print(metrics_dat)
-
-
-# In[17]:
-
-
-vl = 'XJ'
-
-metrics_dat = []
-sarimax_order = {}
-sarimax_order['order'] = (0, 0, 0)
-sarimax_order['sorder'] = (1, 0, 0, 12)
-sarimax_order['trend'] = [0, 0, 0, 0]
-sarimax_order['es'] = False
-
-train,test = split_train_test(sales_data_all, vl, actuals_end_date)
-pred_test = fit_and_predict_sm(train, test, target, all_predictors, plot_results = True, sarimax = sarimax_order, calibrate = True)
-metrics_dat.append(display_results(test[target].values, pred_test, model_name))
-metrics_dat = pd.DataFrame.from_dict(metrics_dat)
-
-print(metrics_dat)
-
-
-# In[18]:
-
-
-vl = 'F-TYPE'
-metrics_dat = []
-sarimax_order = [(1,0,0),(1,1,0,12), [0,0,0,0]]
-train,test = split_train_test(sales_data_all, vl, actuals_end_date)
-
-pred_test = fit_and_predict_sm(train, test, target, all_predictors, plot_results = False, sarimax = sarimax_order, calibrate = True)
-metrics_dat.append(display_results(test[target].values, pred_test, model_name))
-metrics_dat = pd.DataFrame.from_dict(metrics_dat)
-
-print(metrics_dat)
-
-
-# In[19]:
-
-
-vl = 'RANGE ROVER'
-metrics_dat = []
-sarimax_order = {}
-sarimax_order['order'] = (0, 0, 0)
-sarimax_order['sorder'] = (1, 0 , 0, 12)
-sarimax_order['trend'] = [0, 0, 1, 0]
-sarimax_order['es'] = False
-
-train,test = split_train_test(sales_data_all, vl, actuals_end_date)
-
-pred_test = fit_and_predict_sm(train, test, target, all_predictors, plot_results = True, sarimax = sarimax_order, calibrate = False)
-metrics_dat.append(display_results(test[target].values, pred_test, model_name))
-metrics_dat = pd.DataFrame.from_dict(metrics_dat)
-
-print(metrics_dat)
-
-
-# In[20]:
-
-
-vl = 'XE'
-
-
-metrics_dat = []
-sarimax_order = {}
-sarimax_order['order'] = (0, 0, 0)
-sarimax_order['sorder'] = (1, 0 , 0, 12)
-sarimax_order['trend'] = [0, 1, 0 ,0]
-sarimax_order['es'] = False
-
-train,test = split_train_test(sales_data_all, vl, actuals_end_date)
-pred_test = fit_and_predict_sm(train, test, target, all_predictors, plot_results = True, sarimax = sarimax_order, calibrate = False)
-metrics_dat.append(display_results(test[target].values, pred_test, model_name))
-metrics_dat = pd.DataFrame.from_dict(metrics_dat)
-
-print(metrics_dat)
-
-
-# In[21]:
-
-
-train.head()
-
-
-# In[22]:
-
-
 cols = ['TimeStamp','Forecasting Model','Forecasting Model Notes','Forecasted Month','Car Line (Model)',
         'Forecast','Country','MSE','TEASE','TEASEP','mape']
 
@@ -645,18 +457,6 @@ def build_output(test,pred_test, cols, model_name,vl ):
 
 # In[24]:
 
-
-LM_all_arima = {'DISCOVERY SPORT':[(1,0,0),(1,1,0,12), [0,0,0,0]] ,
-                'DISCOVERY': [(1,0,0),(1,1,0,12), [0,0,0,0]],
-                'RANGE ROVER SPORT':[(1,0,0),(1,1,0,12), [0,0,0,0]],
-                'RANGE ROVER EVOQUE':[(1,0,0),(1,1,0,12), [0,0,0,0]],
-                'XF':[(1,0,0),(1,1,0,12), [0,0,0,0]],
-                'XJ': [(1,0,0),(1,1,0,12), [0,0,0,0]],
-                'F-TYPE':[(1,0,0),(1,1,0,12), [0,0,0,0]],
-                'RANGE ROVER': [(1,0,0),(1,1,0,12), [0,0,0,0]],
-                'XE':[(1, 0, 0), (1, 0, 0, 12), [0, 1, 0, 0]]}
-
-
 final_result = []
 models_performance = []
 
@@ -664,11 +464,10 @@ csv_output_name = f'.\\output\\{model_name}'
 for vl in sales_data_all[vehicle_line].unique():
   if (vl not in ['E-PACE','F-PACE','I-PACE','RANGE ROVER VELAR','XK','FREELANDER','DEFENDER']):
     print("\n"+vl)
-    sarimax_order = LM_all_arima[vl]
     df, _= separate_training_portfolio(sales_data_all, vl, actuals_end_date)
     train, test = split_train_test(sales_data_all, vl, actuals_end_date)
     pred_test = fit_and_predict_sm(train, test, 'actual_sales', all_predictors, plot_results = False, 
-                                     sarimax =  sarimax_order, calibrate = True )
+                                     sarimax =  None, calibrate = True )
     #plot_predictions(df, pred_test, vl)
     temp_result = build_output(test, pred_test, cols, model_name,vl )
     model_perf=display_results(test[target], pred_test, model_name, vl)
@@ -688,5 +487,5 @@ print(models_performance)
 # In[25]:
 
 
-print(models_performance[['MAPE','RMSE','TEASEP','vehicle_line']].sort_values(by = 'vehicle_line'))
+print(models_performance[['MAPE','RMSE','TEASEP','vehicle_line']])
 
