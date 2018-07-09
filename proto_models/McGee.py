@@ -69,7 +69,7 @@ class McGee(BaseEstimator,RegressorMixin):
         pacf = sm.tsa.stattools.pacf(res, method='ywmle', alpha=0.95)
         return (pacf)
 
-    def calibrate_sarimax_structure(self, res):
+    def calibrate_sarimax_structure(self, res, calibrate_trend = True):
         sarimax = {'order': (0, 0, 0),
                    'sorder': (0, 0, 0, 12),
                    'trend': [0, 0, 0, 0],
@@ -99,19 +99,21 @@ class McGee(BaseEstimator,RegressorMixin):
         if self.calibrate_pacf(res_model.resid)[0][1] >= 0.3:
 
             if (self.calibrate_pacf(res_model.resid)[0][2] > 0.2 and self.calibrate_pacf(res_model.resid)[0][3] > 0.1):
-
                 sarimax['order'] = (0, 1, 0)
                 res_model = self.calibrate_SARIMAX(res, sarimax)
                 if (self.calibrate_pacf(res_model.resid)[0][1] > 0.3):
                     sarimax['order'] = (1, 1, 0)
                     res_model = self.calibrate_SARIMAX(res, sarimax)
                 elif (self.calibrate_pacf(res_model.resid)[0][1] < -0.35):
-                    try:
-                        sarimax['order'] = (0, 1, 1)
-                        res_model = self.calibrate_SARIMAX(res, sarimax)
-                    except Exception:
-                        sarimax['order'] = (1, 0, 0)
-                        res_model = self.calibrate_SARIMAX(res, sarimax)
+                    sarimax['order'] = (1, 0, 0)
+                    res_model = self.calibrate_SARIMAX(res, sarimax)
+                    if (self.calibrate_pacf(res_model.resid)[0][1] < -0.35):
+                        try:
+                            sarimax['order'] = (1, 0, 1)
+                            res_model = self.calibrate_SARIMAX(res, sarimax)
+                        except Exception:
+                            sarimax['order'] = (0, 0, 0)
+                            res_model = self.calibrate_SARIMAX(res, sarimax)
                 elif (self.calibrate_pacf(res_model.resid)[0][1] > -0.35 and self.calibrate_pacf(res_model.resid)[0][1] <= 0):
                     sarimax['order'] = (0, 0, 0)
                     res_model = self.calibrate_SARIMAX(res, sarimax)
@@ -120,30 +122,44 @@ class McGee(BaseEstimator,RegressorMixin):
                 sarimax['order'] = (1, 0, 0)
                 res_model = self.calibrate_SARIMAX(res, sarimax)
 
-        res_model = self.calibrate_SARIMAX(res, sarimax)
+        if calibrate_trend:
+            res_model = self.calibrate_SARIMAX(res, sarimax)
+            pretrend_p_values = res_model.pvalues
+            sum_of_params = sum(sarimax['order']) + sum(sarimax['sorder'])
+            if sum_of_params <= 14:
+                trend = [[0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]#,[0, 1, 1, 0]]
+                term = [['drift'], ['trend.2'], ['trend.3']]#, ['drift', 'trend.2'] ]
+                aic = []
+                p_values = []
+                original_aic = self.calibrate_SARIMAX(res, sarimax).aic
+                sarimax_temp = sarimax.copy()
+                for i, t in enumerate(trend):
+                    sarimax_temp['trend'] = t
+                    res_model =self.calibrate_SARIMAX(res, sarimax_temp)
+                    aic.append(res_model.aic)
+                    p_values.append(np.mean(res_model.pvalues[term[i]]))
 
+                selected_k = [k for k, p in enumerate(p_values) if p <0.2 and original_aic - aic[k] > 3]
+                if len(selected_k) > 0:
+                    selected_aic = [a for k,a in enumerate(aic) if k in selected_k]
+                    aic_diff = [selected_aic[i] - selected_aic[i-1] for i in range(1, len(selected_k))]
+                    outperform_k = [selected_k[i] for i in range(1,len(selected_k)) if aic_diff[i-1] <= -4 ]
+                    if outperform_k:
+                        trend_k = outperform_k[0]
+                    else:
+                        trend_k = selected_k[0]
+                    sarimax['trend'] = trend[trend_k]
 
-      ########################################
-        sum_of_params = sum(sarimax['order']) + sum(sarimax['sorder'])
-        if sum_of_params <= 13:
-            trend = [[0, 1, 0, 0],[0, 1, 1, 0], [0, 0, 1, 0], [0, 0, 0, 1]]
-            term = [['drift'], ['drift', 'trend.2'], ['trend.2'], ['trend.3'], ['drift', 'trend.3'], ['drift', 'trend.2', 'trend.3'], ['trend.2', 'trend.3'] ]
-            aic = []
-            p_values = []
-            original_aic = self.calibrate_SARIMAX(res, sarimax).aic
-            sarimax_temp = sarimax.copy()
-            for i, t in enumerate(trend):
-                sarimax_temp['trend'] = t
-                res_model =self.calibrate_SARIMAX(res, sarimax_temp)
-                aic.append(res_model.aic)
-                p_values.append(np.mean(res_model.pvalues[term[i]]))
+                res_model = self.calibrate_SARIMAX(res, sarimax)
 
-            selected_k = [k for k, p in enumerate(p_values) if p <0.2]
-            if len(selected_k) > 0:
-                selected_aic = [a for k,a in enumerate(aic) if k in selected_k]
-                if original_aic - min(selected_aic) > 3:
-                    trend_selected = [(k, trend[k]) for k, a in enumerate(aic) if a == min(selected_aic)][0]
-                    sarimax['trend'] = trend_selected[1]
+                if sum_of_params>= 14:
+                    params = pretrend_p_values.index.tolist()
+                    params.remove('sigma2')
+                    posttrend_p_values = res_model.pvalues
+                    pretrend_p_values = pretrend_p_values[params]
+                    pretrend_p_values[pretrend_p_values < 0.01] = 0.01
+                    if any(posttrend_p_values[params] > pretrend_p_values[params]*5):
+                        sarimax['trend'] = [0,0,0,0]
 
         res_model = self.calibrate_SARIMAX(res, sarimax)
         sarimax['es'] =True
@@ -174,11 +190,11 @@ class McGee(BaseEstimator,RegressorMixin):
         res_ori = self.ols_model.resid
         res = res_ori[res_ori.index > self.res_calibrate_date]
         if self.calibrate:
-            self.sarimax_structure = self.calibrate_sarimax_structure(res)
+            self.sarimax_structure = self.calibrate_sarimax_structure(res, calibrate_trend = True)
         self.res_model = self.calibrate_SARIMAX(res, self.sarimax_structure )
-        self.fittedvalues = self.predict(X[X.index > self.res_calibrate_date],out_sample=False)
+        self.fittedvalues = self.predict(X[X.index > self.res_calibrate_date],y = y, out_sample=False)
 
-    def predict(self,X, out_sample = True):
+    def predict(self,X, y = None,  out_sample = True):
         ols_prediction = self.ols_model.get_prediction(X)
         res_prediction = self.res_model.get_prediction(start=X.index.min(), end=X.index.max())
 
@@ -206,8 +222,8 @@ if __name__ == '__main__':
     timeline = 'target_month'
     vehicle_line = 'vehicle_line'
 
-    actuals_end_date = parser.parse('2018-04-01')
-    test_start_date = parser.parse('2018-04-01')
+    actuals_end_date = parser.parse('2019-04-01')
+    test_start_date = parser.parse('2018-05-01')
 
     all_predictors = ['ihs_t_vl', 'IHS_t']
     target = 'actual_sales'
@@ -222,28 +238,27 @@ if __name__ == '__main__':
             'Forecast','actual_sales', 'Country', 'MSE', 'TEASE', 'TEASEP', 'mape']
 
     ##individual car
-    vl = 'XE'
-    df, _ = functions.separate_training_portfolio(sales_data_all, vl, actuals_end_date, timeline, vehicle_line)
-    train, test = functions.split_train_test(sales_data_all, vl, actuals_end_date, test_start_date, timeline,
-                                             vehicle_line)
-
-    pipeline = Pipeline([('IHS_selector', IHS_selector())
-                            , ('McGee', McGee(calibrate=True, vl=vl))])
-
-    pipeline.fit(X=train, y=train[target])
-    out_sample_pred = pipeline.predict(X=test)
-    in_sample_pred = pipeline.named_steps['McGee'].fittedvalues
-    upper_pi = pipeline.named_steps['McGee'].upperpi
-    lower_pi = pipeline.named_steps['McGee'].lowerpi
-    model_perf = functions.display_results(test[target], out_sample_pred, model_name, vl)
-    print(model_perf)
-
-
+    # vl = 'XE'
+    # df, _ = functions.separate_training_portfolio(sales_data_all, vl, actuals_end_date, timeline, vehicle_line)
+    # train, test = functions.split_train_test(sales_data_all, vl, actuals_end_date, test_start_date, timeline,
+    #                                          vehicle_line)
+    #
+    # pipeline = Pipeline([('IHS_selector', IHS_selector())
+    #                         , ('McGee', McGee(calibrate=True, vl=vl))])
+    #
+    # pipeline.fit(X=train, y=train[target])
+    # out_sample_pred = pipeline.predict(X=test)
+    # in_sample_pred = pipeline.named_steps['McGee'].fittedvalues
+    # upper_pi = pipeline.named_steps['McGee'].upperpi
+    # lower_pi = pipeline.named_steps['McGee'].lowerpi
+    # model_perf = functions.display_results(test[target], out_sample_pred, model_name, vl)
+    # print(model_perf)
 
     final_result = []
     models_performance = []
     models_sarimax = []
-    csv_output_name = f'..\\output\\{model_name}'
+    res_model_summaries = {}
+    csv_output_name = f'..\\output\\May_2018_March_2019_{model_name}'
     for vl in sales_data_all[vehicle_line].unique():
         if (vl not in ['E-PACE', 'F-PACE', 'I-PACE', 'RANGE ROVER VELAR', 'XK', 'FREELANDER', 'DEFENDER']):
             print("\n" + vl)
@@ -268,6 +283,8 @@ if __name__ == '__main__':
             models_performance.append(model_perf)
             final_result.append(temp_result)
 
+            res_model_summaries[vl] = pipeline.named_steps['McGee'].res_model.summary()
+
     final_result = pd.concat(final_result)
     final_result = final_result[cols]
     now = pd.Timestamp.now().strftime('%Y-%m-%d')
@@ -279,4 +296,4 @@ if __name__ == '__main__':
 
     print(models_performance[['MAPE', 'RMSE', 'TEASEP', 'vehicle_line','es', 'order', 'sorder','trend','selected_predictor']])
     print('test')
-
+    final_result[final_result['Car Line (Model)'] == 'XE']

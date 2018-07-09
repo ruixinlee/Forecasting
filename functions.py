@@ -23,11 +23,11 @@ def separate_training_portfolio(full_dataset, target_vehicle_line, split_date ,t
 
 def split_train_test(sales_data_all, vl, actuals_end_date,test_start_date, timeline, vehicle_line):
     (df, portfolio_data) = separate_training_portfolio(sales_data_all, vl, actuals_end_date, timeline, vehicle_line)
-    df['actual_sales_lag1'] = df['actual_sales'].shift(1)
-    df['actual_sales_lag2'] = df['actual_sales'].shift(2)
-    df['actual_sales_lag3'] = df['actual_sales'].shift(3)
-    df.dropna(inplace=True)
+    if df.mid_my_cycle[0] == 0:
+        mid_cycle_start=df.index[df.mid_my_cycle==0].min()
+        #df  = df[(df.index >= mid_cycle_start)]
     train = df[(df.index < test_start_date)]
+    train.dropna(inplace=True)
     test = df[(df.index>= test_start_date)]
     return(train, test)
 
