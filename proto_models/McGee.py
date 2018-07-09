@@ -214,20 +214,18 @@ class McGee(BaseEstimator,RegressorMixin):
         return (predictions_all)
 
 
-
-
-
 if __name__ == '__main__':
 
     timeline = 'target_month'
     vehicle_line = 'vehicle_line'
-
-    actuals_end_date = parser.parse('2018-04-01')
-    test_start_date = parser.parse('2017-04-01')
+    model_name = 'model mcgee v5'
+    actuals_end_date = parser.parse('2019-03-01')
+    test_start_date = parser.parse('2018-05-01')
+    csv_output_name = f'..\\output\\May_2018_March_2019_{model_name}'
 
     all_predictors = ['ihs_t_vl', 'IHS_t']
     target = 'actual_sales'
-    model_name = 'model mcgee v5'
+
 
     sales_data_all = load_data.import_sales_data_from_bq()
     sales_data_all[timeline] = pd.to_datetime(sales_data_all[timeline])
@@ -258,7 +256,7 @@ if __name__ == '__main__':
     models_performance = []
     models_sarimax = []
     res_model_summaries = {}
-    csv_output_name = f'..\\output\\May_2018_March_2019_{model_name}'
+
     for vl in sales_data_all[vehicle_line].unique():
         if (vl not in ['E-PACE', 'F-PACE', 'I-PACE', 'RANGE ROVER VELAR', 'XK', 'FREELANDER', 'DEFENDER']):
             print("\n" + vl)
