@@ -127,8 +127,8 @@ class McGee(BaseEstimator,RegressorMixin):
             pretrend_p_values = res_model.pvalues
             sum_of_params = sum(sarimax['order']) + sum(sarimax['sorder'])
             if sum_of_params <= 14:
-                trend = [[0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]#,[0, 1, 1, 0]]
-                term = [['drift'], ['trend.2'], ['trend.3']]#, ['drift', 'trend.2'] ]
+                trend = [[0, 1, 0, 0]]#, [0, 0, 1, 0], [0, 0, 0, 1]]#,[0, 1, 1, 0]]
+                term = [['drift']]#, ['trend.2'], ['trend.3']]#, ['drift', 'trend.2'] ]
                 aic = []
                 p_values = []
                 original_aic = self.calibrate_SARIMAX(res, sarimax).aic
@@ -222,8 +222,8 @@ if __name__ == '__main__':
     timeline = 'target_month'
     vehicle_line = 'vehicle_line'
 
-    actuals_end_date = parser.parse('2019-04-01')
-    test_start_date = parser.parse('2018-05-01')
+    actuals_end_date = parser.parse('2018-04-01')
+    test_start_date = parser.parse('2017-04-01')
 
     all_predictors = ['ihs_t_vl', 'IHS_t']
     target = 'actual_sales'
